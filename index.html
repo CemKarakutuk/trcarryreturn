@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carry Trade Analizi</title>
+<meta name="description" content="Türkiye'de TL mevduata ödenen faizin, kur hareketi sonrasında döviz ve altın cinsinden sağladığı getirinin analizi (2002–günümüz).">
+<!-- Paylaşım önizlemesi (sosyal medya kartı) -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://cemkarakutuk.github.io/trcarryreturn/">
+<meta property="og:title" content="Carry trade getirisi ve TL mevduat faiz politikası">
+<meta property="og:description" content="TL mevduata ödenen faizin, kur hareketi ve stopaj sonrasında döviz ve altın cinsinden sağladığı 12 aylık net getiri. Haftalık, 2002–günümüz, TCMB EVDS verisi.">
+<meta property="og:image" content="https://cemkarakutuk.github.io/trcarryreturn/assets/og-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="2002–2026 arasında USD carry trade'inin 12 aylık net getirisini gösteren grafik">
+<meta property="og:locale" content="tr_TR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Carry trade getirisi ve TL mevduat faiz politikası">
+<meta name="twitter:description" content="TL mevduata ödenen faizin, kur hareketi ve stopaj sonrasında döviz ve altın cinsinden sağladığı 12 aylık net getiri. Haftalık, 2002–günümüz.">
+<meta name="twitter:image" content="https://cemkarakutuk.github.io/trcarryreturn/assets/og-preview.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css?v=6">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>window.Plotly || document.write('<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"><\/script>')</script>
+<script>window.Plotly || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js"><\/script>')</script>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <h1>Carry trade getirisi ve TL mevduat faiz politikası</h1>
+    <p class="subtitle">TL mevduata yatırılan dövizin 12 aylık net getirisi, haftalık, 2002–günümüz</p>
+    <p class="meta" id="metaLine">Veri yükleniyor…</p>
+  </div>
+</header>
+
+<section class="controls" aria-label="Analiz ayarları">
+  <div class="wrap controls-inner">
+    <div class="ctl">
+      <span class="ctl-label" id="curLabel">Döviz</span>
+      <div class="seg" role="radiogroup" aria-labelledby="curLabel" id="curSeg">
+        <button type="button" role="radio" data-cur="USD" aria-checked="true">USD</button>
+        <button type="button" role="radio" data-cur="EUR" aria-checked="false">EUR</button>
+        <button type="button" role="radio" data-cur="GBP" aria-checked="false">GBP</button>
+        <button type="button" role="radio" data-cur="XAU" aria-checked="false">Gram altın</button>
+      </div>
+    </div>
+    <label class="ctl">
+      <span class="ctl-label">TL faiz serisi</span>
+      <select id="ser">
+        <option value="tum">Toplam (tüm vadeler)</option>
+        <option value="m1">1 aya kadar vadeli</option>
+        <option value="m3">3 aya kadar vadeli</option>
+        <option value="m6">6 aya kadar vadeli</option>
+        <option value="y1">1 yıla kadar vadeli</option>
+        <option value="y1p">1 yıl ve daha uzun vadeli</option>
+      </select>
+    </label>
+    <label class="ctl">
+      <span class="ctl-label">Vade (yenileme)</span>
+      <select id="term">
+        <option value="m1">1 ay</option>
+        <option value="m3">3 ay</option>
+        <option value="m6">6 ay</option>
+        <option value="y1" selected>1 yıl</option>
+        <option value="y1p">1 yıldan uzun</option>
+      </select>
+    </label>
+    <label class="ctl">
+      <span class="ctl-label">Stopaj</span>
+      <select id="taxMode">
+        <option value="period">Dönemin oranları</option>
+        <option value="fixed">Sabit oran</option>
+        <option value="none">Stopajsız (brüt)</option>
+      </select>
+    </label>
+    <label class="ctl" id="fixedWrap" hidden>
+      <span class="ctl-label">Sabit stopaj (%)</span>
+      <input id="fixedTax" type="number" min="0" max="100" step="0.5" value="15">
+    </label>
+    <label class="ctl">
+      <span class="ctl-label">Enflasyon ölçütü</span>
+      <select id="deflator">
+        <option value="tufe">TÜFE</option>
+        <option value="ufe">Yİ-ÜFE</option>
+      </select>
+    </label>
+    <div class="ctl checks">
+      <span class="ctl-label">Gösterim</span>
+      <div class="check-row">
+        <label><input type="checkbox" id="spread" checked> Kur makası</label>
+        <label><input type="checkbox" id="showTl"> TL nominal</label>
+        <label><input type="checkbox" id="showReal" checked> Reel TL</label>
+        <label><input type="checkbox" id="showFx"> Kur değişimi (sonraki 52 hafta)</label>
+        <label><input type="checkbox" id="showEvents" checked> Olaylar</label>
+      </div>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+
+  <section class="block" id="bulgu">
+    <h2><span class="num">1</span>Carry trade getirisi: 12 aylık pencere</h2>
+    <div id="mainChart" class="chart chart-main" role="img" aria-label="Başlangıç haftasına göre 12 aylık carry trade getirisi"></div>
+    <p class="figcap below" id="mainCaption"></p>
+    <p class="chart-note">
+      Düz çizgi tamamlanmış 12 aylık dönemleri, kesikli çizgi 13–51 haftadır süren dönemlerin yıllıklandırılmış
+      getirisini gösterir. Bir haftaya tıklayarak o tarihten bugüne, grafiği yakınlaştırarak da görünen aralık için dönem analizini açabilirsiniz. Çift tıklama tüm döneme döner.
+    </p>
+    <p class="intro">
+      Bu çalışma; yerleşik yatırımcıların döviz ve kur korumalı mevduattan (KKM) Türk lirası mevduata yönlendirilmesi ile yabancı carry trade akımlarının çekilmesi amacıyla TL mevduata sağlanan getiri düzeyini incelemektedir.
+      Ölçüt, TL mevduata yatırılan dövizin stopaj ve kur hareketi sonrasında aynı döviz cinsinden sağladığı net getiridir.
+      Varsayılan gösterim: toplam TL mevduat faizinin (TP.TRY.MT06) yıllık işletildiği ABD doları carry trade'inin 12 aylık net getirisi.
+    </p>
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <button type="button" class="btn" id="dlMain">Grafik verisini indir (CSV)</button>
+    </div>
+  </section>
+
+  <section class="block" id="donem">
+    <h2><span class="num">2</span>Dönem analizi</h2>
+    <p class="lead">Başlangıç ve bitiş tarihini seçin ya da yukarıdaki grafikte bir haftaya tıklayın. Değerler seçilen dönem için kümülatiftir; yıllık bileşik karşılıkları kartlarda verilir.</p>
+    <div class="period-controls">
+      <label class="ctl"><span class="ctl-label">Başlangıç</span><input type="date" id="pStart"></label>
+      <label class="ctl"><span class="ctl-label">Bitiş</span><input type="date" id="pEnd"></label>
+      <label class="ctl"><span class="ctl-label" id="amtLabel">Tutar (USD)</span><input type="number" id="pAmount" min="1" step="1000" value="100000"></label>
+      <div class="quick">
+        <button type="button" class="btn ghost" data-quick="52" title="Başlangıçtan itibaren 1 yıl">1 yıl</button>
+        <button type="button" class="btn ghost" data-quick="156" title="Başlangıçtan itibaren 3 yıl">3 yıl</button>
+        <button type="button" class="btn ghost" data-quick="260" title="Başlangıçtan itibaren 5 yıl">5 yıl</button>
+        <button type="button" class="btn ghost" data-quick="toEnd" title="Başlangıçtan bugüne">Bugüne kadar</button>
+      </div>
+    </div>
+    <div class="cards" id="cards"></div>
+    <p class="chart-note" id="cumNote"></p>
+    <details class="rolls">
+      <summary>Mevduat dökümü: faiz, stopaj ve bakiye</summary>
+      <div class="scroll"><table id="rollTable"></table></div>
+    </details>
+  </section>
+
+  <section class="block prose" id="yontem">
+    <h2><span class="num">3</span>Yöntem</h2>
+    <div class="cols">
+      <div>
+        <h3>Carry trade getirisi</h3>
+        <p>Yatırımcı başlangıç haftasında dövizini (ya da altınını) bankaya satarak TL'ye çevirir ve seçilen vadede TL mevduata yatırır.
+        Vade sonunda anapara ve net faiz, o haftanın faiz oranıyla yeniden yatırılır. Dönem sonunda TL bakiye tekrar dövize çevrilir.
+        Getiri, başlangıçtaki döviz tutarına göre döviz cinsinden hesaplanır.</p>
+        <p>Faiz serisi ile vade birbirinden bağımsız seçilir. Faiz her vadede <em>bakiye × yıllık oran × gün / 365</em> olarak işler;
+        vade sonunda anapara ve net faiz, o haftanın seçilen faiz serisi oranıyla yeniden yatırılır.
+        Vadeler 1 ay için 4, 3 ay için 13, 6 ay için 26, 1 yıl ve daha uzun vade için 52 haftadır.
+        Varsayılan gösterimde toplam (tüm vadeler) faiz serisi yıllık işletilir: başlangıç haftasının oranıyla 52 haftalık tek bir mevduat açılır, faiz vade sonunda bir kez tahakkuk eder ve "1 yıla kadar" stopajı uygulanır.
+        Bir faiz serisi seçildiğinde vade, serinin kendi vadesine ayarlanır; istenirse ayrıca değiştirilebilir.</p>
+        <h3>Stopaj</h3>
+        <p>Her vadede, vadenin açıldığı veya yenilendiği tarihte geçerli stopaj oranı brüt faizden düşülür.
+        Stopaj kademesi seçilen vadeye göre belirlenir: 1, 3 ve 6 aylık vadelerde "6 aya kadar",
+        1 yıllık vadede "1 yıla kadar", 1 yıldan uzun vadede "1 yıldan uzun" oranı uygulanır.</p>
+        <div class="scroll"><table id="taxTable" class="compact"></table></div>
+      </div>
+      <div>
+        <h3>Kur ve makas</h3>
+        <p>Kur makası açıkken giriş TCMB döviz alış kuruyla (döviz bankaya satılır), çıkış döviz satış kuruyla (döviz bankadan alınır) yapılır.
+        Kapalıyken iki uçta da alış kuru kullanılır. Bankaların uyguladığı makas TCMB makasından genellikle daha geniştir.
+        Gram altın için tek fiyat kullanıldığından makas uygulanmaz.</p>
+        <h3>Reel getiri</h3>
+        <p>Reel TL getiri, <em>(1 + nominal TL getiri) ÷ (1 + dönem enflasyonu) − 1</em> ile hesaplanır.
+        Dönem enflasyonu, başlangıç ve bitiş haftalarının ait olduğu ayların endeks değerlerinden bulunur.
+        Endeks verisi henüz açıklanmamış aylarda reel getiri hesaplanmaz.</p>
+        <h3>Yıllıklandırma</h3>
+        <p>52 haftadan kısa dönemlerde yıllık bileşik getiri <em>(1 + r)<sup>52/h</sup> − 1</em> ile hesaplanır (h: hafta).
+        Kısa dönemlerde kur oynaklığı yıllıklandırılmış değeri büyüttüğünden ana grafikte yalnızca en az 13 haftalık dönemler gösterilir.
+        Dönem sonu bir vadenin ortasına denk gelirse işlemiş faiz tahakkuk esasıyla hesaba katılır.</p>
+        <h3>Sınırlılıklar</h3>
+        <p>Faiz serileri bankaların akım bazlı ağırlıklı ortalamasıdır; bireysel yatırımcının elde ettiği oran farklı olabilir.
+        Döviz alımındaki işlem vergileri ve banka komisyonları modele dahil değildir.
+        EVDS haftalık kurları hafta ortalaması olarak indirildiğinde giriş ve çıkış kuru, gerçek işlem kurundan sapabilir; bu etki özellikle kur şoku haftalarında belirginleşir.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block prose" id="veri">
+    <h2><span class="num">4</span>Veri ve kaynaklar</h2>
+    <h3 id="dataScopeTitle">Veri seçimi ve kapsam</h3>
+    <p id="dataScope">Kurumsal türev modellerine odaklanan çalışmalarda yaygın olarak kullanılan TLREF verisinin 2018/2019 öncesine uzanan bir geçmişi bulunmamaktadır.
+    Bu çalışmada zaman serisini 2000'lerin başına kadar kesintisiz uzatabilmek ve farklı makroekonomik rejimleri karşılaştırabilmek için
+    TCMB EVDS'de yayımlanan ağırlıklı ortalama TL mevduat faizleri (TP.TRY.MT serileri) esas alınmıştır.
+    Çalışma bir yandan yurt içi yerleşiklerin döviz mevduatı ve KKM'den Türk lirasına geçiş kararlarındaki fiili fırsat maliyetini,
+    diğer yandan ödemeler dengesi finans hesabı altındaki mevduat yükümlülükleri (yurt dışı yerleşiklerin mevduat girişleri)
+    üzerinden gerçekleşen nakit carry dinamiklerini yansıtmayı amaçlamaktadır.</p>
+    <ul class="sources">
+      <li><strong>Mevduat faizleri:</strong> TCMB EVDS, TL mevduat faiz oranları (akım, haftalık), TP.TRY.MT01–MT06.</li>
+      <li><strong>Döviz kurları:</strong> TCMB EVDS, USD, EUR ve GBP döviz alış ve satış kurları (haftalık), TP.DK.*.A.YTL ve TP.DK.*.S.YTL.</li>
+      <li><strong>Gram altın:</strong> ICE, XAU/TRY (emtia CFD), haftalık TL/gram fiyatı.</li>
+      <li><strong>Fiyat endeksleri:</strong> TÜİK (EVDS üzerinden), TÜFE 2003=100 (TP.GENENDEKS.T1) ve Yİ-ÜFE (TP.TUFE1YI.T1), aylık.</li>
+      <li><strong>Stopaj oranları:</strong> Resmî Gazete'de yayımlanan Bakanlar Kurulu ve Cumhurbaşkanı kararları.</li>
+    </ul>
+    <p class="downloads">
+      <a class="btn" href="data/dataset.csv" download>Birleştirilmiş veri seti (CSV)</a>
+      <a class="btn ghost" href="data/dataset.json" download>JSON</a>
+    </p>
+    <p class="meta" id="metaFiles"></p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p class="contact"><strong>Hazırlayan:</strong> Cem Karakutuk · <a href="mailto:cemkarakutuk@hotmail.com">cemkarakutuk@hotmail.com</a></p>
+    <p>Bu site akademik amaçlıdır ve yatırım tavsiyesi içermez. Hesaplamalar tarayıcıda, açık veri ve belgelenmiş varsayımlarla yapılır.</p>
+  </div>
+</footer>
+
+<script src="assets/js/app.js?v=8"></script>
+</body>
+</html>
