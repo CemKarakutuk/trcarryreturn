@@ -33,7 +33,13 @@ import requests
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw"
-BASE = "https://evds2.tcmb.gov.tr/service/evds/"
+# EVDS web servisi evds3'e taşındı; eski adres HTML ana sayfaya yönleniyor.
+# Sırayla denenir, çalışan adres sonraki isteklerde doğrudan kullanılır.
+ENDPOINTS = [
+    "https://evds3.tcmb.gov.tr/igmevdsms-dis/",
+    "https://evds2.tcmb.gov.tr/service/evds/",
+]
+_working_endpoint = None
 START = "01-01-2002"
 
 # EVDS frekans kodları: 1 günlük, 2 iş günü, 3 haftalık, 5 aylık
@@ -78,27 +84,68 @@ def parse_date(raw):
 
 
 def fetch(series, frequency, key):
-    """Tek bir EVDS isteği; başarısızlıkta iki kez yeniden dener."""
-    url = (f"{BASE}series={'-'.join(series)}&startDate={START}"
-           f"&endDate={date.today().strftime('%d-%m-%Y')}"
-           f"&type=json&frequency={frequency}&aggregationTypes={AGGREGATION}")
+    """Tek bir EVDS isteği. Çalışan uç noktayı bulana kadar sırayla dener."""
+    global _working_endpoint
+    query = (f"series={'-'.join(series)}&startDate={START}"
+             f"&endDate={date.today().strftime('%d-%m-%Y')}"
+             f"&type=json&frequency={frequency}&aggregationTypes={AGGREGATION}")
+    bases = [_working_endpoint] if _working_endpoint else ENDPOINTS
+    errors = []
+    for base in bases:
+        try:
+            items = request_once(base + query, key)
+            if _working_endpoint != base:
+                print(f"  uç nokta: {base}")
+                _working_endpoint = base
+            return items
+        except Exception as e:
+            errors.append(f"{base} -> {e}")
+    raise SystemExit("EVDS isteği başarısız.\n  " + "\n  ".join(errors))
+
+
+class Fatal(Exception):
+    """Yeniden denemenin işe yaramayacağı yanıt (yanlış adres, HTML gövde…)."""
+
+
+def request_once(url, key):
+    """Tek adrese istek; geçici ağ hatasında iki kez yeniden dener."""
     last_error = None
+    headers = {
+        "key": key,
+        "Accept": "application/json",
+        # Bazı TCMB uç noktaları tarayıcı başlığı olmayan isteklere HTML sayfa döndürüyor
+        "User-Agent": "Mozilla/5.0 (compatible; trcarryreturn-data-bot)",
+    }
     for attempt in range(3):
         try:
-            r = requests.get(url, headers={"key": key}, timeout=120)
+            # allow_redirects=False: yönlendirme izlenirse 'key' başlığı başka bir
+            # sunucuya gidebilir. Yönlendirme gelirse adres yanlış demektir.
+            r = requests.get(url, headers=headers, timeout=120, allow_redirects=False)
+            if r.is_redirect or r.status_code in (301, 302, 303, 307, 308):
+                raise Fatal(f"yönlendirme ({r.status_code} -> {r.headers.get('location', '?')})")
             if r.status_code == 401:
                 sys.exit("EVDS anahtarı reddedildi (401). EVDS_API_KEY değerini kontrol edin.")
             r.raise_for_status()
-            payload = r.json()
+            try:
+                payload = r.json()
+            except ValueError:
+                # 200 döndü ama gövde JSON değil: ne geldiğini log'a yaz
+                body = " ".join(r.text.split())[:400] or "(boş gövde)"
+                raise Fatal(
+                    f"JSON değil | HTTP {r.status_code} "
+                    f"| content-type: {r.headers.get('content-type', '?')} "
+                    f"| gövde: {body}")
             items = payload.get("items")
             if not items:
-                raise ValueError(f"EVDS boş yanıt döndürdü: {str(payload)[:200]}")
+                raise ValueError(f"EVDS boş yanıt döndürdü: {str(payload)[:300]}")
             return items
-        except Exception as e:                        # ağ hatası, JSON hatası, boş yanıt
+        except Fatal:                                  # yeniden denemenin anlamı yok
+            raise
+        except Exception as e:                        # geçici ağ/JSON hatası
             last_error = e
             if attempt < 2:
-                time.sleep(5 * (attempt + 1))
-    raise SystemExit(f"EVDS isteği başarısız ({'-'.join(series)}): {last_error}")
+                time.sleep(3 * (attempt + 1))
+    raise ValueError(last_error)
 
 
 def build_frame(items, series, frequency):
