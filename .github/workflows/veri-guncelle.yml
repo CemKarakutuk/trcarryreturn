@@ -1,1 +1,58 @@
+name: Veri güncelle
 
+# Üç şekilde çalışır:
+#  1. Her pazartesi 07:00 UTC (Türkiye saatiyle 10:00) kendiliğinden,
+#  2. data/raw/ klasörüne bir dosya yüklendiğinde (ör. gram_altin.xlsx),
+#  3. Actions sekmesinden "Run workflow" ile elle.
+# (2) sonsuz döngüye yol açmaz: bu iş kendi commit'ini GITHUB_TOKEN ile attığı
+# için GitHub o commit'te yeni bir çalıştırma başlatmaz.
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  push:
+    paths:
+      - "data/raw/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: veri-guncelle
+  cancel-in-progress: false
+
+jobs:
+  guncelle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repoyu al
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bağımlılıkları kur
+        run: pip install --quiet pandas openpyxl requests
+
+      - name: EVDS verilerini indir
+        env:
+          EVDS_API_KEY: ${{ secrets.EVDS_API_KEY }}
+        run: python scripts/fetch_evds.py
+
+      - name: dataset dosyalarını üret
+        run: python scripts/update_data.py
+
+      - name: Değişiklikleri commit'le
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "Yeni veri yok, commit yapılmadı."
+          else
+            git commit -m "Veri güncellendi ($(date -u +%d.%m.%Y))"
+            git push
+            echo "Veri güncellendi ve yayınlandı."
+          fi
