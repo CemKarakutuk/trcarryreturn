@@ -1,14 +1,12 @@
 name: Veri güncelle
 
-# Üç şekilde çalışır:
-#  1. Her pazartesi 07:00 UTC (Türkiye saatiyle 10:00) kendiliğinden,
-#  2. data/raw/ klasörüne bir dosya yüklendiğinde (ör. gram_altin.xlsx),
-#  3. Actions sekmesinden "Run workflow" ile elle.
-# (2) sonsuz döngüye yol açmaz: bu iş kendi commit'ini GITHUB_TOKEN ile attığı
-# için GitHub o commit'te yeni bir çalıştırma başlatmaz.
+# data/raw/ klasörüne bir dosya yüklendiğinde (weekly, monthly, gold, stopaj)
+# kendiliğinden çalışır ve dataset dosyalarını yeniden üretir.
+# Actions sekmesinden "Run workflow" ile elle de başlatılabilir.
+#
+# Sonsuz döngü olmaz: bu iş kendi commit'ini GITHUB_TOKEN ile attığı için
+# GitHub o commit'te yeni bir çalıştırma başlatmaz.
 on:
-  schedule:
-    - cron: "0 7 * * 1"
   push:
     paths:
       - "data/raw/**"
@@ -34,12 +32,7 @@ jobs:
           python-version: "3.12"
 
       - name: Bağımlılıkları kur
-        run: pip install --quiet pandas openpyxl requests
-
-      - name: EVDS verilerini indir
-        env:
-          EVDS_API_KEY: ${{ secrets.EVDS_API_KEY }}
-        run: python scripts/fetch_evds.py
+        run: pip install --quiet pandas openpyxl
 
       - name: dataset dosyalarını üret
         run: python scripts/update_data.py
@@ -48,9 +41,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
+          git add data/dataset.json data/dataset.csv
           if git diff --staged --quiet; then
-            echo "Yeni veri yok, commit yapılmadı."
+            echo "Veride değişiklik yok, commit yapılmadı."
           else
             git commit -m "Veri güncellendi ($(date -u +%d.%m.%Y))"
             git push
